@@ -63,6 +63,7 @@ class ActionType(Enum):
     DRAW = auto()
     PASS = auto()
     CUT = auto()
+    DECLARE = auto()
 
 
 @dataclass

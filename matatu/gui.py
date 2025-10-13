@@ -56,6 +56,9 @@ class MatatuGUI:
         self.cut_btn = tk.Button(self.center_frame, text="Cut", command=self.on_cut)
         self.cut_btn.grid(row=0, column=2, padx=6)
 
+        self.declare_btn = tk.Button(self.center_frame, text="Declare Suit", command=self.on_declare)
+        self.declare_btn.grid(row=0, column=3, padx=6)
+
         # Suit selection for Ace
         self.suit_var = tk.StringVar(value="C")
         suit_frame = tk.Frame(self.center_frame)
@@ -92,9 +95,11 @@ class MatatuGUI:
             btn = tk.Button(self.hand_frame, text=str(card), state=state, command=lambda c=card: self.on_play(c))
             btn.grid(row=0, column=i, padx=4, pady=4)
 
-        # Enable/disable draw/cut
-        self.draw_btn.config(state=tk.NORMAL if self.state.winner is None else tk.DISABLED)
-        self.cut_btn.config(state=tk.NORMAL if self.state.winner is None else tk.DISABLED)
+        # Enable/disable draw/cut/declare
+        awaiting_you = getattr(self.state, 'awaiting_declare', None) == 0
+        self.declare_btn.config(state=tk.NORMAL if (self.state.winner is None and awaiting_you) else tk.DISABLED)
+        self.draw_btn.config(state=tk.NORMAL if (self.state.winner is None and not awaiting_you) else tk.DISABLED)
+        self.cut_btn.config(state=tk.NORMAL if (self.state.winner is None and not awaiting_you) else tk.DISABLED)
 
         # If CPU turn, schedule action
         if self.state.winner is None and self.state.current_player == 1:
@@ -108,11 +113,20 @@ class MatatuGUI:
             messagebox.showinfo("Rule", "Cannot finish on 8 or J")
             return
         if card.rank is Rank.ACE:
-            suit_map = {"C": Suit.CLUBS, "D": Suit.DIAMONDS, "H": Suit.HEARTS, "S": Suit.SPADES}
-            declared = suit_map[self.suit_var.get()]
-            self.state = apply_action(self.state, Action(ActionType.PLAY, card=card, declared_suit=declared))
+            # Play Ace first; user will press Declare to choose suit
+            self.state = apply_action(self.state, Action(ActionType.PLAY, card=card))
         else:
             self.state = apply_action(self.state, Action(ActionType.PLAY, card=card))
+        self.post_turn_check()
+
+    def on_declare(self) -> None:
+        if self.state.winner is not None or self.state.current_player != 0:
+            return
+        if getattr(self.state, 'awaiting_declare', None) != 0:
+            return
+        suit_map = {"C": Suit.CLUBS, "D": Suit.DIAMONDS, "H": Suit.HEARTS, "S": Suit.SPADES}
+        declared = suit_map[self.suit_var.get()]
+        self.state = apply_action(self.state, Action(ActionType.DECLARE, declared_suit=declared))
         self.post_turn_check()
 
     def on_draw(self) -> None:
@@ -129,7 +143,9 @@ class MatatuGUI:
         except Exception as e:
             messagebox.showinfo("Invalid cut", str(e))
             return
-        self.end_hand()
+        # Show the cutting card on top briefly before ending the hand
+        self.refresh_ui()
+        self.root.after(800, self.end_hand)
 
     def cpu_step(self) -> None:
         if self.state.winner is not None or self.state.current_player != 1:
@@ -144,7 +160,9 @@ class MatatuGUI:
     def post_turn_check(self) -> None:
         # Check winner and payout
         if self.state.winner is not None:
-            self.end_hand()
+            # Ensure the top cutting card is visible before ending
+            self.refresh_ui()
+            self.root.after(800, self.end_hand)
         else:
             self.refresh_ui()
 

@@ -15,6 +15,10 @@ def choose_suit_by_majority(hand: List[Card]) -> Suit:
 
 def cpu_choose_action(state: GameState, rng: random.Random) -> Action:
     idx = state.current_player
+    # If CPU must declare after playing Ace, declare majority suit now
+    if getattr(state, 'awaiting_declare', None) == idx:
+        suit = choose_suit_by_majority(state.players[idx].hand)
+        return Action(ActionType.DECLARE, declared_suit=suit)
     plays = legal_plays(state, idx)
 
     # Check if CPU can cut (has 7 of cut suit and total points <= 25)
@@ -41,8 +45,8 @@ def cpu_choose_action(state: GameState, rng: random.Random) -> Action:
                 if c.rank is Rank.SEVEN and c.suit is state.cut_suit:
                     continue
                 if c.rank is Rank.ACE:
-                    suit = choose_suit_by_majority(state.players[idx].hand)
-                    return Action(ActionType.PLAY, card=c, declared_suit=suit)
+                    # Play the Ace first; we'll declare on next action
+                    return Action(ActionType.PLAY, card=c)
                 return Action(ActionType.PLAY, card=c)
 
     # Otherwise play any legal card (bias to high ranks to reduce points)

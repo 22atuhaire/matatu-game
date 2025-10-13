@@ -18,7 +18,8 @@ except Exception:  # pragma: no cover
 
 def print_state(state: GameState) -> None:
     top = state.top_discard()
-    print(f"Top: {top}  | Cut suit: {state.cut_suit.value}  | Pending draw: {state.pending_draw}  | Declared suit: {state.declared_suit.value if state.declared_suit else '-'}")
+    awaiting = state.awaiting_declare if hasattr(state, 'awaiting_declare') else None
+    print(f"Top: {top}  | Cut suit: {state.cut_suit.value}  | Pending draw: {state.pending_draw}  | Declared suit: {state.declared_suit.value if state.declared_suit else '-'}  | Awaiting declare: {awaiting if awaiting is not None else '-'}")
 
 
 def hand_str(cards) -> str:
@@ -57,6 +58,10 @@ def choose_suit_interactive() -> Suit:
 
 
 def player_turn(state: GameState) -> GameState:
+    # If an Ace was just played by you, you must declare first
+    if getattr(state, 'awaiting_declare', None) == 0:
+        suit = choose_suit_interactive()
+        return apply_action(state, Action(ActionType.DECLARE, declared_suit=suit))
     plays = legal_plays(state, 0)
     print_state(state)
     print(f"Your hand: {hand_str(state.players[0].hand)}")
@@ -80,8 +85,11 @@ def player_turn(state: GameState) -> GameState:
         card = parse_card(cmd.upper())
         if card and card in state.players[0].hand and card in plays:
             if card.rank is Rank.ACE:
+                # Play the Ace first so it's visible on top, then declare
+                state = apply_action(state, Action(ActionType.PLAY, card=card))
+                print_state(state)
                 suit = choose_suit_interactive()
-                return apply_action(state, Action(ActionType.PLAY, card=card, declared_suit=suit))
+                return apply_action(state, Action(ActionType.DECLARE, declared_suit=suit))
             # Enforce cannot end on 8 or J
             if len(state.players[0].hand) == 1 and card.rank in (Rank.EIGHT, Rank.JACK):
                 print("Cannot finish on 8 or J. Choose another card.")

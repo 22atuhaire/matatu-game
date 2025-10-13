@@ -31,6 +31,7 @@ class GameState:
     cut_suit: Suit
     pending_draw: int = 0  # accumulated from 2's
     declared_suit: Optional[Suit] = None  # from Ace
+    awaiting_declare: Optional[int] = None  # which player must declare after playing Ace
     winner: Optional[int] = None
 
     def top_discard(self) -> Card:
@@ -65,6 +66,9 @@ def deal_new_game(rng: random.Random) -> GameState:
 
 
 def is_play_legal(state: GameState, card: Card) -> bool:
+    # If a declaration is pending, no card play is legal until suit is declared
+    if state.awaiting_declare is not None:
+        return False
     top = state.top_discard()
     # A cannot be played on a 2
     if top.rank is Rank.TWO and card.rank is Rank.ACE:
@@ -81,6 +85,9 @@ def is_play_legal(state: GameState, card: Card) -> bool:
 
 def legal_plays(state: GameState, player_idx: int) -> List[Card]:
     if state.winner is not None:
+        return []
+    # If this player must declare due to a previously played Ace, no plays are legal
+    if state.awaiting_declare == player_idx:
         return []
     hand = state.players[player_idx].hand
     # If pending draw from 2's, player may only defend with a TWO (stack), else must draw
@@ -126,12 +133,10 @@ def apply_action(state: GameState, action: Action) -> GameState:
             # Extra turn, cannot be final card enforced by caller/UI
             pass
         elif card.rank is Rank.ACE:
-            # Must have declared suit
-            if action.declared_suit is None:
-                raise ValueError("Ace requires declared_suit")
-            state.declared_suit = action.declared_suit
-            # Extra turn? Not specified; treat as normal turn end
-            state.current_player = (state.current_player + 1) % 2
+            # Two-step: show Ace on top first; require a separate DECLARE action
+            state.awaiting_declare = state.current_player
+            # Turn does not advance until declaration
+            return state
         elif card.rank is Rank.SEVEN and card.suit is state.cut_suit:
             # Playing 7 of cut suit automatically triggers cut
             # Check if player can cut (total points <= 25)
@@ -155,6 +160,9 @@ def apply_action(state: GameState, action: Action) -> GameState:
         return state
 
     if action.type is ActionType.DRAW:
+        # Cannot draw if awaiting declaration
+        if state.awaiting_declare is not None:
+            raise ValueError("Must declare suit before other actions")
         # Draw pending if any, else 1
         to_draw = state.pending_draw if state.pending_draw > 0 else 1
         state.pending_draw = 0
@@ -176,18 +184,41 @@ def apply_action(state: GameState, action: Action) -> GameState:
         return state
 
     if action.type is ActionType.PASS:
+        if state.awaiting_declare is not None:
+            raise ValueError("Must declare suit before passing")
         state.current_player = (state.current_player + 1) % 2
         return state
 
     if action.type is ActionType.CUT:
+        if state.awaiting_declare is not None:
+            raise ValueError("Must declare suit before cutting")
         # Valid only if player has 7 of cut suit and total points <= 25
+    if action.type is ActionType.DECLARE:
+        # Only valid if awaiting declaration for current player
+        if state.awaiting_declare != state.current_player:
+            raise ValueError("No declaration pending")
+        if action.declared_suit is None:
+            raise ValueError("Declared suit required")
+        state.declared_suit = action.declared_suit
+        state.awaiting_declare = None
+        # After declaring, end the turn (Ace does not grant extra turn here)
+        state.current_player = (state.current_player + 1) % 2
+        return state
         total = sum(card_points(c.rank) for c in player.hand)
-        has_cut_seven = any((c.rank is Rank.SEVEN and c.suit is state.cut_suit) for c in player.hand)
-        if not has_cut_seven or total > 25:
+        # Locate the cutting card (7 of cut suit)
+        cut_card: Optional[Card] = None
+        for c in player.hand:
+            if c.rank is Rank.SEVEN and c.suit is state.cut_suit:
+                cut_card = c
+                break
+        if cut_card is None or total > 25:
             raise ValueError("Invalid cut")
+        # Place the cutting card on the discard pile so it's visible on top
+        player.hand.remove(cut_card)
+        state.discard.append(cut_card)
         # Compute scores; lowest points wins
         other = state.players[(state.current_player + 1) % 2]
-        a = total
+        a = total - card_points(cut_card.rank)  # player's remaining hand points after placing the cut card
         b = sum(card_points(c.rank) for c in other.hand)
         state.winner = state.current_player if a < b else (state.current_player + 1) % 2
         return state
