@@ -1,0 +1,20 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "matatu"
+version = "0.1.0"
+description = "Matatu card game (casino variant) - Python desktop prototype"
+authors = [{ name = "Matatu Dev" }]
+readme = "README.md"
+requires-python = ">=3.9"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+
+[project.scripts]
+matatu-cli = "matatu.cli:main"
+matatu-gui = "matatu.gui:main"
