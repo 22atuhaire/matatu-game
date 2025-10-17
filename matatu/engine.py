@@ -3,15 +3,35 @@ import random
 from dataclasses import dataclass, field
 from typing import List, Optional, Tuple
 
-from .types import Card, Suit, Rank, Action, ActionType, same_rank, same_suit, card_points
+from .types import (
+    Card,
+    Suit,
+    Rank,
+    Action,
+    ActionType,
+    same_rank,
+    same_suit,
+    card_points,
+)
 
 
 def generate_deck() -> List[Card]:
     deck: List[Card] = []
     for suit in [Suit.CLUBS, Suit.DIAMONDS, Suit.HEARTS, Suit.SPADES]:
         for rank in [
-            Rank.ACE, Rank.TWO, Rank.THREE, Rank.FOUR, Rank.FIVE, Rank.SIX,
-            Rank.SEVEN, Rank.EIGHT, Rank.NINE, Rank.TEN, Rank.JACK, Rank.QUEEN, Rank.KING
+            Rank.ACE,
+            Rank.TWO,
+            Rank.THREE,
+            Rank.FOUR,
+            Rank.FIVE,
+            Rank.SIX,
+            Rank.SEVEN,
+            Rank.EIGHT,
+            Rank.NINE,
+            Rank.TEN,
+            Rank.JACK,
+            Rank.QUEEN,
+            Rank.KING,
         ]:
             deck.append(Card(suit, rank))
     return deck
@@ -31,7 +51,9 @@ class GameState:
     cut_suit: Suit
     pending_draw: int = 0  # accumulated from 2's
     declared_suit: Optional[Suit] = None  # from Ace
-    awaiting_declare: Optional[int] = None  # which player must declare after playing Ace
+    awaiting_declare: Optional[int] = (
+        None  # which player must declare after playing Ace
+    )
     winner: Optional[int] = None
 
     def top_discard(self) -> Card:
@@ -70,11 +92,13 @@ def is_play_legal(state: GameState, card: Card) -> bool:
     if state.awaiting_declare is not None:
         return False
     top = state.top_discard()
-    # A cannot be played on a 2
-    if top.rank is Rank.TWO and card.rank is Rank.ACE:
+    # A cannot be played on a 2 if there's still a pending draw
+    if state.pending_draw > 0 and top.rank is Rank.TWO and card.rank is Rank.ACE:
         return False
     # If an Ace suit was declared previously, match that suit unless using rank match
-    effective_suit = state.declared_suit if state.declared_suit is not None else top.suit
+    effective_suit = (
+        state.declared_suit if state.declared_suit is not None else top.suit
+    )
 
     if same_rank(card, top):
         return True
@@ -93,16 +117,18 @@ def legal_plays(state: GameState, player_idx: int) -> List[Card]:
     # If pending draw from 2's, player may only defend with a TWO (stack), else must draw
     if state.pending_draw > 0:
         return [c for c in hand if c.rank is Rank.TWO]
-    
+
     # Calculate total points to check if 7 of cut suit should be excluded
     total_points = sum(card_points(c.rank) for c in hand)
-    
+
     legal = [c for c in hand if is_play_legal(state, c)]
-    
+
     # If player has more than 25 points, exclude 7 of cut suit from legal plays
     if total_points > 25:
-        legal = [c for c in legal if not (c.rank is Rank.SEVEN and c.suit is state.cut_suit)]
-    
+        legal = [
+            c for c in legal if not (c.rank is Rank.SEVEN and c.suit is state.cut_suit)
+        ]
+
     return legal
 
 
@@ -146,7 +172,9 @@ def apply_action(state: GameState, action: Action) -> GameState:
                 other = state.players[(state.current_player + 1) % 2]
                 a = total
                 b = sum(card_points(c.rank) for c in other.hand)
-                state.winner = state.current_player if a < b else (state.current_player + 1) % 2
+                state.winner = (
+                    state.current_player if a < b else (state.current_player + 1) % 2
+                )
                 return state
             else:
                 # Cannot cut due to high points, continue normal turn
@@ -193,17 +221,6 @@ def apply_action(state: GameState, action: Action) -> GameState:
         if state.awaiting_declare is not None:
             raise ValueError("Must declare suit before cutting")
         # Valid only if player has 7 of cut suit and total points <= 25
-    if action.type is ActionType.DECLARE:
-        # Only valid if awaiting declaration for current player
-        if state.awaiting_declare != state.current_player:
-            raise ValueError("No declaration pending")
-        if action.declared_suit is None:
-            raise ValueError("Declared suit required")
-        state.declared_suit = action.declared_suit
-        state.awaiting_declare = None
-        # After declaring, end the turn (Ace does not grant extra turn here)
-        state.current_player = (state.current_player + 1) % 2
-        return state
         total = sum(card_points(c.rank) for c in player.hand)
         # Locate the cutting card (7 of cut suit)
         cut_card: Optional[Card] = None
@@ -218,9 +235,22 @@ def apply_action(state: GameState, action: Action) -> GameState:
         state.discard.append(cut_card)
         # Compute scores; lowest points wins
         other = state.players[(state.current_player + 1) % 2]
-        a = total - card_points(cut_card.rank)  # player's remaining hand points after placing the cut card
+        a = total - card_points(
+            cut_card.rank
+        )  # player's remaining hand points after placing the cut card
         b = sum(card_points(c.rank) for c in other.hand)
         state.winner = state.current_player if a < b else (state.current_player + 1) % 2
+        return state
+    if action.type is ActionType.DECLARE:
+        # Only valid if awaiting declaration for current player
+        if state.awaiting_declare != state.current_player:
+            raise ValueError("No declaration pending")
+        if action.declared_suit is None:
+            raise ValueError("Declared suit required")
+        state.declared_suit = action.declared_suit
+        state.awaiting_declare = None
+        # After declaring, end the turn (Ace does not grant extra turn here)
+        state.current_player = (state.current_player + 1) % 2
         return state
 
     raise ValueError("Unknown action")
