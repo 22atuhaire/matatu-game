@@ -11,6 +11,7 @@ try:
 except Exception:  # pragma: no cover
     import sys
     from pathlib import Path
+
     sys.path.append(str(Path(__file__).resolve().parent.parent))
     from matatu.engine import deal_new_game, apply_action, legal_plays  # type: ignore
     from matatu.types import Action, ActionType, Suit, Card, Rank  # type: ignore
@@ -47,7 +48,9 @@ class MatatuGUI:
 
         # Center controls
         self.top_card_var = tk.StringVar()
-        self.top_card_label = tk.Label(self.center_frame, textvariable=self.top_card_var, font=("Arial", 16))
+        self.top_card_label = tk.Label(
+            self.center_frame, textvariable=self.top_card_var, font=("Arial", 16)
+        )
         self.top_card_label.grid(row=0, column=0, padx=6)
 
         self.draw_btn = tk.Button(self.center_frame, text="Draw", command=self.on_draw)
@@ -56,15 +59,24 @@ class MatatuGUI:
         self.cut_btn = tk.Button(self.center_frame, text="Cut", command=self.on_cut)
         self.cut_btn.grid(row=0, column=2, padx=6)
 
-        self.declare_btn = tk.Button(self.center_frame, text="Declare Suit", command=self.on_declare)
+        self.declare_btn = tk.Button(
+            self.center_frame, text="Declare Suit", command=self.on_declare
+        )
         self.declare_btn.grid(row=0, column=3, padx=6)
 
         # Suit selection for Ace
         self.suit_var = tk.StringVar(value="C")
         suit_frame = tk.Frame(self.center_frame)
         suit_frame.grid(row=1, column=0, columnspan=3)
-        for s, label in [("C", "Clubs"), ("D", "Diamonds"), ("H", "Hearts"), ("S", "Spades")]:
-            tk.Radiobutton(suit_frame, text=label, value=s, variable=self.suit_var).pack(side=tk.LEFT)
+        for s, label in [
+            ("C", "Clubs"),
+            ("D", "Diamonds"),
+            ("H", "Hearts"),
+            ("S", "Spades"),
+        ]:
+            tk.Radiobutton(
+                suit_frame, text=label, value=s, variable=self.suit_var
+            ).pack(side=tk.LEFT)
 
         # Player hand buttons
         self.hand_frame = tk.Frame(self.bottom_frame)
@@ -75,7 +87,9 @@ class MatatuGUI:
     def refresh_ui(self) -> None:
         top = self.state.top_discard()
         declared = self.state.declared_suit.value if self.state.declared_suit else "-"
-        self.top_card_var.set(f"Top: {top} | Cut: {self.state.cut_suit.value} | Pending: {self.state.pending_draw} | Declared: {declared}")
+        self.top_card_var.set(
+            f"Top: {top} | Cut: {self.state.cut_suit.value} | Pending: {self.state.pending_draw} | Declared: {declared}"
+        )
         self.balance_var.set(f"Balance: {self.balance} | Stake: {self.stake}")
 
         # Update info
@@ -92,14 +106,31 @@ class MatatuGUI:
         legal = set(legal_plays(self.state, 0))
         for i, card in enumerate(self.state.players[0].hand):
             state = tk.NORMAL if card in legal else tk.DISABLED
-            btn = tk.Button(self.hand_frame, text=str(card), state=state, command=lambda c=card: self.on_play(c))
+            btn = tk.Button(
+                self.hand_frame,
+                text=str(card),
+                state=state,
+                command=lambda c=card: self.on_play(c),
+            )
             btn.grid(row=0, column=i, padx=4, pady=4)
 
         # Enable/disable draw/cut/declare
-        awaiting_you = getattr(self.state, 'awaiting_declare', None) == 0
-        self.declare_btn.config(state=tk.NORMAL if (self.state.winner is None and awaiting_you) else tk.DISABLED)
-        self.draw_btn.config(state=tk.NORMAL if (self.state.winner is None and not awaiting_you) else tk.DISABLED)
-        self.cut_btn.config(state=tk.NORMAL if (self.state.winner is None and not awaiting_you) else tk.DISABLED)
+        awaiting_you = getattr(self.state, "awaiting_declare", None) == 0
+        self.declare_btn.config(
+            state=tk.NORMAL
+            if (self.state.winner is None and awaiting_you)
+            else tk.DISABLED
+        )
+        self.draw_btn.config(
+            state=tk.NORMAL
+            if (self.state.winner is None and not awaiting_you)
+            else tk.DISABLED
+        )
+        self.cut_btn.config(
+            state=tk.NORMAL
+            if (self.state.winner is None and not awaiting_you)
+            else tk.DISABLED
+        )
 
         # If CPU turn, schedule action
         if self.state.winner is None and self.state.current_player == 1:
@@ -108,25 +139,32 @@ class MatatuGUI:
     def on_play(self, card: Card) -> None:
         if self.state.winner is not None or self.state.current_player != 0:
             return
-        # Enforce cannot finish on 8 or J
-        if len(self.state.players[0].hand) == 1 and card.rank in (Rank.EIGHT, Rank.JACK):
+        # Only 8 and J cannot be final cards
+        if len(self.state.players[0].hand) == 1 and card.rank in (
+            Rank.EIGHT,
+            Rank.JACK,
+        ):
             messagebox.showinfo("Rule", "Cannot finish on 8 or J")
             return
-        if card.rank is Rank.ACE:
-            # Play Ace first; user will press Declare to choose suit
-            self.state = apply_action(self.state, Action(ActionType.PLAY, card=card))
-        else:
-            self.state = apply_action(self.state, Action(ActionType.PLAY, card=card))
+        # Ace is allowed as final card - it requires declaration to complete
+        self.state = apply_action(self.state, Action(ActionType.PLAY, card=card))
         self.post_turn_check()
 
     def on_declare(self) -> None:
         if self.state.winner is not None or self.state.current_player != 0:
             return
-        if getattr(self.state, 'awaiting_declare', None) != 0:
+        if getattr(self.state, "awaiting_declare", None) != 0:
             return
-        suit_map = {"C": Suit.CLUBS, "D": Suit.DIAMONDS, "H": Suit.HEARTS, "S": Suit.SPADES}
+        suit_map = {
+            "C": Suit.CLUBS,
+            "D": Suit.DIAMONDS,
+            "H": Suit.HEARTS,
+            "S": Suit.SPADES,
+        }
         declared = suit_map[self.suit_var.get()]
-        self.state = apply_action(self.state, Action(ActionType.DECLARE, declared_suit=declared))
+        self.state = apply_action(
+            self.state, Action(ActionType.DECLARE, declared_suit=declared)
+        )
         self.post_turn_check()
 
     def on_draw(self) -> None:
@@ -151,8 +189,13 @@ class MatatuGUI:
         if self.state.winner is not None or self.state.current_player != 1:
             return
         action = cpu_choose_action(self.state, self.rng)
-        # Enforce cannot finish on 8 or J
-        if action.type is ActionType.PLAY and len(self.state.players[1].hand) == 1 and action.card and action.card.rank in (Rank.EIGHT, Rank.JACK):
+        # CPU also cannot finish on 8 or J (but can finish with Ace)
+        if (
+            action.type is ActionType.PLAY
+            and len(self.state.players[1].hand) == 1
+            and action.card
+            and action.card.rank in (Rank.EIGHT, Rank.JACK)
+        ):
             action = Action(ActionType.DRAW)
         self.state = apply_action(self.state, action)
         self.post_turn_check()

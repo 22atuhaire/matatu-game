@@ -183,7 +183,8 @@ def apply_action(state: GameState, action: Action) -> GameState:
             state.current_player = (state.current_player + 1) % 2
 
         # Win check
-        if len(player.hand) == 0:
+        # Only check for winner if this wasn't an Ace play (which requires declaration)
+        if len(player.hand) == 0 and card.rank is not Rank.ACE:
             state.winner = state.current_player ^ 1  # previous player
         return state
 
@@ -249,8 +250,12 @@ def apply_action(state: GameState, action: Action) -> GameState:
             raise ValueError("Declared suit required")
         state.declared_suit = action.declared_suit
         state.awaiting_declare = None
-        # After declaring, end the turn (Ace does not grant extra turn here)
-        state.current_player = (state.current_player + 1) % 2
+        # After declaring, check if this was the last card
+        if len(player.hand) == 0:
+            state.winner = state.current_player  # current player wins with Ace
+        else:
+            # If not the last card, end the turn (Ace does not grant extra turn)
+            state.current_player = (state.current_player + 1) % 2
         return state
 
     raise ValueError("Unknown action")
