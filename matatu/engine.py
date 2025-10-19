@@ -55,6 +55,7 @@ class GameState:
         None  # which player must declare after playing Ace
     )
     winner: Optional[int] = None
+    cut_winner: bool = False  # True if win was achieved through a cut
 
     def top_discard(self) -> Card:
         return self.discard[-1]
@@ -175,6 +176,7 @@ def apply_action(state: GameState, action: Action) -> GameState:
                 state.winner = (
                     state.current_player if a < b else (state.current_player + 1) % 2
                 )
+                state.cut_winner = True
                 return state
             else:
                 # Cannot cut due to high points, continue normal turn
@@ -241,6 +243,7 @@ def apply_action(state: GameState, action: Action) -> GameState:
         )  # player's remaining hand points after placing the cut card
         b = sum(card_points(c.rank) for c in other.hand)
         state.winner = state.current_player if a < b else (state.current_player + 1) % 2
+        state.cut_winner = True
         return state
     if action.type is ActionType.DECLARE:
         # Only valid if awaiting declaration for current player

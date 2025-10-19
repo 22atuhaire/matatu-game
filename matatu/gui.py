@@ -210,12 +210,18 @@ class MatatuGUI:
             self.refresh_ui()
 
     def end_hand(self) -> None:
+        win_amount = self.stake * 2 if self.state.cut_winner else self.stake
+        win_type = "cut" if self.state.cut_winner else "regular"
         if self.state.winner == 0:
-            self.balance += self.stake
-            messagebox.showinfo("Result", f"You win! +{self.stake}")
+            self.balance += win_amount
+            messagebox.showinfo(
+                "Result", f"You win with a {win_type} win! +{win_amount}"
+            )
         else:
-            self.balance -= self.stake
-            messagebox.showinfo("Result", f"CPU wins. -{self.stake}")
+            self.balance -= win_amount
+            messagebox.showinfo(
+                "Result", f"CPU wins with a {win_type} win. -{win_amount}"
+            )
         # Start next hand
         self.state = deal_new_game(self.rng)
         self.refresh_ui()

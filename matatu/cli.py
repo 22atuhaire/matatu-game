@@ -127,11 +127,15 @@ def main() -> None:
                     state = cpu_turn(state, rng)
             # Payout
             if state.winner == 0:
-                balance += stake
-                print(f"You win! +{stake}. Balance: {balance}")
+                win_amount = stake * 2 if state.cut_winner else stake
+                balance += win_amount
+                win_type = "cut" if state.cut_winner else "regular"
+                print(f"You win with a {win_type} win! +{win_amount}. Balance: {balance}")
             else:
-                balance -= stake
-                print(f"CPU wins. -{stake}. Balance: {balance}")
+                loss_amount = stake * 2 if state.cut_winner else stake
+                balance -= loss_amount
+                win_type = "cut" if state.cut_winner else "regular"
+                print(f"CPU wins with a {win_type} win. -{loss_amount}. Balance: {balance}")
 
             # Adjust stake or continue
             cmd = input("Enter 's <amount>' to set stake, or Enter to continue: ").strip()
